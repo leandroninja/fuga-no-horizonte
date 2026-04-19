@@ -2,6 +2,8 @@
 
 Jogo de corrida pseudo-3D em Python inspirado nos clássicos portáteis dos anos 90. Desvie do tráfego, colete combustível e sobreviva o maior tempo possível.
 
+![Tela inicial](screenshot.png)
+
 ## Como jogar
 
 ```bash

@@ -314,7 +314,7 @@ class Game:
 
     def __init__(self):
         self.screen = pygame.display.set_mode((SCREEN_W, SCREEN_H))
-        pygame.display.set_caption("Corrida Maluca")
+        pygame.display.set_caption("Fuga no Horizonte")
         self.clock  = pygame.time.Clock()
         self._load_assets()
         self.highscore = load_highscore()
@@ -332,6 +332,28 @@ class Game:
         self.font_lg = pygame.font.SysFont("Arial Black", 34, bold=True)
         self.font_md = pygame.font.SysFont("Arial Black", 22, bold=True)
         self.font_sm = pygame.font.SysFont("Arial",       17)
+
+        # Inimigos demo para animar o menu
+        self.menu_enemies = [EnemyCar(self.enemy_imgs) for _ in range(5)]
+        for me in self.menu_enemies:
+            me.t     = uniform(0.05, 0.9)
+            me.speed = uniform(0.004, 0.009)
+
+        # Brilho do sol no horizonte (pré-calculado)
+        self.sun_surf = pygame.Surface((200, 120), pygame.SRCALPHA)
+        for _r in range(58, 0, -1):
+            _a = int(100 * (1 - _r / 58))
+            pygame.draw.circle(self.sun_surf, (255, 220, 80, _a), (100, 95), _r + 22)
+        pygame.draw.circle(self.sun_surf, (255, 248, 160), (100, 95), 22)
+
+        # Overlay degradê do menu (pré-calculado)
+        self.menu_overlay = pygame.Surface((SCREEN_W, SCREEN_H), pygame.SRCALPHA)
+        for _row in range(SCREEN_H):
+            _a = int(70 + 150 * _row / SCREEN_H)
+            pygame.draw.line(
+                self.menu_overlay, (0, 0, 0, _a),
+                (0, _row), (SCREEN_W, _row)
+            )
 
     def _init_game(self):
         self.player    = Player(self.player_img)
@@ -382,17 +404,59 @@ class Game:
 
     # ── Menu ──────────────────────────────────────────────────────────────────
     def _menu(self):
-        self.scroll += SCROLL_SPD * 2
+        self.scroll += SCROLL_SPD * 3.5
+
+        # Atualiza inimigos demo
+        for me in self.menu_enemies:
+            me.t += me.speed
+            if me.t > 1.15:
+                me.t     = 0.0
+                me.lane  = randint(0, NUM_LANES - 1)
+                me.image = choice(self.enemy_imgs)
+
+        # Estrada pseudo-3D rolando
         draw_road(self.screen, self.sky_surf, self.scroll)
-        self.overlay.fill((0, 0, 0, 155))
-        self.screen.blit(self.overlay, (0, 0))
-        draw_text(self.screen, "CORRIDA MALUCA",              self.font_xl, YELLOW, SCREEN_W // 2, 140, center=True)
-        draw_text(self.screen, "Desvie do trafego!",          self.font_md, WHITE,  SCREEN_W // 2, 225, center=True)
-        draw_text(self.screen, f"Recorde: {self.highscore}s", self.font_md, ORANGE, SCREEN_W // 2, 268, center=True)
-        draw_text(self.screen, "Setas: trocar faixa  |  ESC: pausar", self.font_sm, GRAY, SCREEN_W // 2, 330, center=True)
-        draw_text(self.screen, "Colete as latas amarelas para reabastecer!", self.font_sm, YELLOW, SCREEN_W // 2, 358, center=True)
-        if (pygame.time.get_ticks() // 480) % 2 == 0:
-            draw_text(self.screen, "ENTER ou ESPACO para jogar", self.font_lg, GREEN, SCREEN_W // 2, 430, center=True)
+
+        # Brilho do sol no horizonte
+        self.screen.blit(self.sun_surf, (SCREEN_W // 2 - 100, HORIZON_Y - 95))
+
+        # Carros demo (mais distantes primeiro)
+        for me in sorted(self.menu_enemies, key=lambda o: o.t):
+            me.draw(self.screen)
+
+        # Carro do jogador na base
+        self.screen.blit(self.player_img, (SCREEN_W // 2 - 27, SCREEN_H - 95))
+
+        # Overlay degradê
+        self.screen.blit(self.menu_overlay, (0, 0))
+
+        # Título com cor pulsante
+        t_ms  = pygame.time.get_ticks()
+        pulse = abs((t_ms % 1800) / 900.0 - 1.0)
+        tc    = (255, int(180 + 75 * pulse), int(60 * pulse))
+        draw_text(self.screen, "FUGA NO HORIZONTE", self.font_xl, tc,
+                  SCREEN_W // 2, 115, center=True)
+
+        # Painel de informações
+        pw, ph = 480, 200
+        panel  = pygame.Surface((pw, ph), pygame.SRCALPHA)
+        panel.fill((0, 0, 0, 130))
+        pygame.draw.rect(panel, (255, 200, 50, 120), (0, 0, pw, ph), 2,
+                         border_radius=10)
+        self.screen.blit(panel, (SCREEN_W // 2 - pw // 2, 195))
+
+        draw_text(self.screen, "Desvie do trafego!",
+                  self.font_md, WHITE,  SCREEN_W // 2, 215, center=True)
+        draw_text(self.screen, f"Recorde: {self.highscore}s",
+                  self.font_md, ORANGE, SCREEN_W // 2, 257, center=True)
+        draw_text(self.screen, "Setas <- -> : trocar faixa  |  ESC: pausar",
+                  self.font_sm, GRAY,   SCREEN_W // 2, 320, center=True)
+        draw_text(self.screen, "Latas amarelas: combustivel extra",
+                  self.font_sm, YELLOW, SCREEN_W // 2, 348, center=True)
+
+        if (t_ms // 500) % 2 == 0:
+            draw_text(self.screen, "ENTER ou ESPACO para jogar",
+                      self.font_lg, GREEN, SCREEN_W // 2, 435, center=True)
 
     # ── Jogando ───────────────────────────────────────────────────────────────
     def _playing(self):
